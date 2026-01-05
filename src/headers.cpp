@@ -53,7 +53,7 @@ void iterHeaders(std::string_view req, Callback &&callback) {
     }
 }
 
-std::pair<std::string, std::string> findHostPort(std::string_view req) {
+HostPort findHostPort(std::string_view req) {
     std::string_view host_with_port;
 
     iterHeaders(req, [&](std::string_view name, std::string_view value) {
@@ -63,7 +63,7 @@ std::pair<std::string, std::string> findHostPort(std::string_view req) {
     });
 
     if (host_with_port.empty()) {
-        return {"", "80"};
+        return {std::string{}, kDefaultHttpPort};
     }
 
     // Находим позицию первого ':' (порт начинается после него)
@@ -71,7 +71,7 @@ std::pair<std::string, std::string> findHostPort(std::string_view req) {
 
     if (colon_pos == std::string_view::npos) {
         // Нет порта — возвращаем весь хост и "80"
-        return {std::string(host_with_port), "80"};
+        return {std::string(host_with_port), kDefaultHttpPort};
     }
 
     std::string_view host_part = host_with_port.substr(0, colon_pos);
@@ -79,17 +79,22 @@ std::pair<std::string, std::string> findHostPort(std::string_view req) {
 
     // Случай: "Host: example.com:" → порт пустой → используем "80"
     if (port_part.empty()) {
-        return {std::string(host_part), "80"};
+        return {std::string(host_part), kDefaultHttpPort};
     }
 
     return {std::string(host_part), std::string(port_part)};
 }
 
 std::optional<size_t> findContentLength(std::string_view rsp) {
-    std::optional<size_t> result;
+    constexpr size_t kMaxContentLengthDigits = 20;
 
+    std::optional<size_t> result;
     iterHeaders(rsp, [&](std::string_view name, std::string_view value) {
         if (iequals(name, "content-length"sv)) {
+            if (value.size() > kMaxContentLengthDigits) {
+                return;  // значение слишком длинное — игнорируем
+            }
+
             size_t len = 0;
             auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), len);
             if (ec == std::errc{}) {
@@ -97,6 +102,5 @@ std::optional<size_t> findContentLength(std::string_view rsp) {
             }
         }
     });
-
     return result;
 }

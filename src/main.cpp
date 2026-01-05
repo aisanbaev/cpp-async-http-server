@@ -18,7 +18,10 @@ using boost::asio::use_awaitable;
 using boost::asio::ip::tcp;
 using boost::system::error_code;
 
+namespace {
 constexpr std::string_view delimiter = "\r\n\r\n";
+constexpr size_t kBufferSize = 8192;
+}  // namespace
 
 awaitable<void> session(tcp::socket client_socket, io_service &io_service) {
     try {
@@ -66,7 +69,7 @@ awaitable<void> session(tcp::socket client_socket, io_service &io_service) {
         }
 
         // 6. Теперь читаем ответ от сервера и передаём всё клиенту
-        std::array<char, 8192> buffer;
+        std::array<char, kBufferSize> buffer;
         while (true) {
             auto [ec, n] = co_await server_socket.async_read_some(boost::asio::buffer(buffer),
                                                                   boost::asio::as_tuple(boost::asio::use_awaitable));
